@@ -1,0 +1,2 @@
+# ABSURD-projekt-
+Bekorchilik
