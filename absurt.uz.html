@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>absurd.</title>
+    <style>
+        /* --- DESIGN SYSTEM (ABSURD BRUTALISM) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', Courier, monospace; }
+        
+        body {
+            background-color: #050505;
+            color: #e6e6e6;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            text-align: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #app { width: 90%; max-width: 600px; position: relative; z-index: 10; }
+        .hidden { display: none !important; }
+
+        /* Typography & Effects */
+        #text-container {
+            font-size: 20px;
+            line-height: 1.8;
+            min-height: 150px;
+            margin-bottom: 50px;
+            transition: opacity 2s ease-in-out;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .blur-effect { filter: blur(5px); opacity: 0.3; }
+
+        /* UI Elements */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #050505; display: flex; justify-content: center;
+            align-items: center; cursor: pointer; z-index: 1000;
+            transition: opacity 3s;
+        }
+        #start-screen span { opacity: 0.3; font-size: 12px; letter-spacing: 5px; animation: pulse 3s infinite; }
+
+        @keyframes pulse { 0% { opacity: 0.2; } 50% { opacity: 0.5; } 100% { opacity: 0.2; } }
+
+        .ui-group { display: flex; flex-direction: column; align-items: center; gap: 30px; animation: fadeIn 2s; }
+        
+        input {
+            background: transparent; border: none; border-bottom: 2px solid #222;
+            color: #e6e6e6; padding: 15px; font-size: 22px; text-align: center;
+            outline: none; width: 300px; transition: 0.8s;
+        }
+        input:focus { border-bottom: 2px solid #e6e6e6; }
+        
+        button {
+            background: transparent; color: #e6e6e6; border: 1px solid #333;
+            padding: 15px 40px; font-size: 13px; cursor: pointer; letter-spacing: 3px;
+            text-transform: uppercase; transition: 0.4s;
+        }
+        button:hover { border-color: #eee; }
+        button:active { background: #eee; color: #000; }
+
+        /* Loading Engine */
+        #loading-area { margin-top: 30px; }
+        #bar-frame {
+            width: 280px; height: 1px; background: #111;
+            margin: 25px auto; position: relative; overflow: hidden;
+        }
+        #bar-fill { width: 0%; height: 100%; background: #fff; transition: width 0.6s; }
+        #percent { font-size: 40px; font-weight: 100; color: #444; }
+        #loading-subtext { font-size: 14px; opacity: 0.4; margin-top: 15px; font-style: italic; }
+
+        /* Certificate System */
+        #cert-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.85);
+            width: 95%; max-width: 900px; z-index: 500; background: #fff;
+            display: none; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+        }
+        #cert-modal img { width: 100%; height: auto; display: block; border: 1px solid #ccc; }
+        #controls { margin-top: 30px; display: flex; gap: 15px; }
+
+        /* Visual Noise Background */
+        #canvas-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0.1; }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas-bg"></canvas>
+
+    <div id="start-screen">
+        <span>[ ABSURD
+              (bekorchi)]</span>
+    </div>
+
+    <div id="app" class="hidden">
+        <div id="text-container"></div>
+        
+        <div id="interaction" class="hidden ui-group">
+            <input type="text" id="user-name" placeholder="ISMINGIZ..." maxlength="30">
+            <button id="confirm-btn">Tasdiqlash</button>
+        </div>
+
+        <div id="loading-area" class="hidden">
+            <div id="bar-frame"><div id="bar-fill"></div></div>
+            <span id="percent">0%</span>
+            <div id="loading-subtext"></div>
+        </div>
+
+        <div id="final-controls" class="hidden ui-group">
+            <button id="dl-btn">Yuklab olish</button>
+            <button id="close-btn">Bo'ldi, ketaman</button>
+        </div>
+    </div>
+
+    <div id="cert-modal">
+        <img id="cert-img" src="" alt="Sertifikat">
+    </div>
+
+    <canvas id="offscreen-canvas" width="1200" height="900" style="display:none;"></canvas>
+
+    <script>
+        /* --- THE ABSURD CORE ENGINE --- */
+
+        let store = JSON.parse(localStorage.getItem('absurd_v3')) || { seen: 0, done: false, user: "" };
+        
+        const ui = {
+            start: document.getElementById('start-screen'),
+            app: document.getElementById('app'),
+            txt: document.getElementById('text-container'),
+            inputBox: document.getElementById('interaction'),
+            loader: document.getElementById('loading-area'),
+            bar: document.getElementById('bar-fill'),
+            pct: document.getElementById('percent'),
+            subTxt: document.getElementById('loading-subtext'),
+            nameInp: document.getElementById('user-name'),
+            confBtn: document.getElementById('confirm-btn'),
+            modal: document.getElementById('cert-modal'),
+            img: document.getElementById('cert-img'),
+            final: document.getElementById('final-controls'),
+            dl: document.getElementById('dl-btn'),
+            exit: document.getElementById('close-btn')
+        };
+
+        // Kengaytirilgan va cho'zilgan ssenariy
+        const lines = [
+            { t: "Assalomu alaykum...", d: 15000 },
+            { t: "Seni kutayotganimni aytmoqchi edim, lekin bu ham bekorchilik bo'lardi.", d: 20000 },
+            { t: "Hozir sening telefoningda faqat men borman. Boshqa narsani o'ylama.", d: 18000 },
+            { t: "Bilasanmi, inson hayotining 30 foizini kutish bilan o'tkazar ekan...", d: 22000 },
+            { t: "Sen hozir o'sha 30 foizni yanada boyityapsan. Rahmat.", d: 16000 },
+            { t: "Eshityapsanmi? Past chastotali bu ovoz sening asablaringni sekin egallaydi.", d: 25000 },
+            { t: "Agar zerikayotgan bo'lsang — demak sen tiriksan. Ma'nosiz narsalardan zavq olishni o'rgan.", d: 28000 },
+            { t: "Men hozir nimadir qilaman deb o'ylayapsanmi?", d: 15000 },
+            { t: "Yo'q. Shunchaki matnlarni sekin-sekin chiqarib turaveraman.", d: 20000 },
+            { t: "Chunki bizga shoshadigan joy yo'q.", d: 15000 },
+            { t: "Xullas... seni sinovdan o'tkazish vaqti keldi.", d: 18000 }
+        ];
+
+        const loadQuips = {
+            20: "Boshlanishi yomon emas, lekin hali juda ko'p...",
+            50: "50 foiz? Bu shunchaki aldov. Men hozir to'xtab qolishim ham mumkin.",
+            75: "Yarmidan o'tdik, lekin oxiri baribir yo'qdek tuyulmayaptimi?",
+            90: "Deyarli tayyor... Lekin sening sabring tugayotganini sezyapman."
+        };
+
+        // --- AUDIO ENGINE ---
+        let ac, osc, gain, filt;
+        function playDrone() {
+            ac = new (window.AudioContext || window.webkitAudioContext)();
+            osc = ac.createOscillator();
+            gain = ac.createGain();
+            filt = ac.createBiquadFilter();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(40, ac.currentTime); // Juda chuqur bass
+            filt.type = 'lowpass';
+            filt.frequency.setValueAtTime(100, ac.currentTime);
+
+            gain.gain.setValueAtTime(0, ac.currentTime);
+            gain.gain.linearRampToValueAtTime(0.15, ac.currentTime + 15);
+
+            osc.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+            osc.start();
+        }
+
+        function vibr(ms) { if(navigator.vibrate) navigator.vibrate(ms); }
+
+        // --- CORE FUNCTIONS ---
+        async function say(msg, delay) {
+            ui.txt.style.opacity = 0;
+            return new Promise(r => {
+                setTimeout(() => {
+                    ui.txt.innerText = msg;
+                    ui.txt.style.opacity = 1;
+                    setTimeout(r, delay);
+                }, 2000);
+            });
+        }
+
+        ui.start.onclick = () => {
+            ui.start.style.opacity = 0;
+            playDrone();
+            setTimeout(() => {
+                ui.start.classList.add('hidden');
+                ui.app.classList.remove('hidden');
+                main();
+            }, 3000);
+        };
+
+        async function main() {
+            store.seen++;
+            localStorage.setItem('absurd_v3', JSON.stringify(store));
+
+            if(store.done) {
+                await say(`Yana kelibsan, ${store.user}.`, 15000);
+                await say("bir paytlar senga aytganimdek, foydali ish qil, masalan... azimga osh ober! hayr*", 15000);
+                return;
+            }
+
+            for(let line of lines) {
+                await say(line.t, line.d);
+                if(Math.random() > 0.8) vibr(50);
+            }
+
+            runLoader();
+        }
+
+        function runLoader() {
+            ui.loader.classList.remove('hidden');
+            let p = 0;
+            let iv = setInterval(() => {
+                p += (Math.random() * 0.4); // Juda sekin loading
+                if(p >= 100) {
+                    p = 100; clearInterval(iv);
+                    setTimeout(ask, 5000);
+                }
+                ui.bar.style.width = p + "%";
+                ui.pct.innerText = Math.floor(p) + "%";
+                
+                let check = Math.floor(p);
+                if(loadQuips[check]) ui.subTxt.innerText = loadQuips[check];
+                if(check % 25 === 0) vibr(30);
+            }, 600);
+        }
+
+        async function ask() {
+            ui.loader.classList.add('hidden');
+            await say("Men senga ishondim. Sabring po'latdan ekan.", 15000);
+            await say("Endi ismingni ayt, tarixda qoldiramiz.", 10000);
+            ui.inputBox.classList.remove('hidden');
+        }
+
+        ui.confBtn.onclick = async () => {
+            let n = ui.nameInp.value.trim().toUpperCase();
+            if(n.length < 2) return alert("Haqiqiy ism yoz!");
+            store.user = n;
+            ui.inputBox.classList.add('hidden');
+            
+            await say(`Xm... ${n}.`, 10000);
+            await say("Sertifikat tayyorlanmoqda. Bu jarayonni tezlashtirib bo'lmaydi.", 15000);
+            
+            draw(n);
+        };
+
+        function draw(name) {
+            const c = document.getElementById('offscreen-canvas');
+            const x = c.getContext('2d');
+
+            // Background & Borders
+            x.fillStyle = '#fff'; x.fillRect(0,0,1200,900);
+            x.strokeStyle = '#000'; x.lineWidth = 30; x.strokeRect(50,50,1100,800);
+            x.lineWidth = 4; x.strokeRect(75,75,1050,750);
+
+            // Text
+            x.fillStyle = '#000'; x.textAlign = 'center';
+            x.font = 'bold 50px Courier'; x.fillText('TASDIQLANGAN BEKORCHI SERTIFIKATI', 600, 180);
+            
+            x.font = '30px Courier'; x.fillText('Ushbu hujjat tantanali ravishda', 600, 300);
+            
+            x.font = 'bold 80px Courier'; x.fillText(name, 600, 420);
+            
+            // Description (Kattaroq va qalinroq)
+            x.font = 'bold 28px Courier';
+            let desc = [
+                "Hayotdagi eng qimmatli daqiqalarni mutlaqo mantiqsiz,",
+                "foydasiz va absurd narsalarga sarflash bo'yicha",
+                "yuqori mahorat hamda chidamlilik ko'rsatgani uchun",
+                "aslamov.tech va 'Absurd' loyihasi tomonidan topshirildi."
+            ];
+            desc.forEach((line, i) => x.fillText(line, 600, 520 + (i*45)));
+
+            // Signatures
+            x.font = 'bold 30px Courier'; x.textAlign = 'left';
+            x.fillText('Tasdiqladi:', 180, 780);
+            x.font = 'italic 40px Serif'; x.fillText('Aslamov Abduazim✨', 450, 780);
+            
+            ui.img.src = c.toDataURL();
+            setTimeout(() => {
+                ui.modal.style.display = 'block';
+                ui.final.classList.remove('hidden');
+                vibr(300);
+            }, 5000);
+        }
+
+        ui.dl.onclick = () => {
+            const a = document.createElement('a');
+            a.download = `BEKORCHI_${store.user}.png`;
+            a.href = ui.img.src;
+            a.click();
+        };
+
+        ui.exit.onclick = async () => {
+            ui.modal.style.display = 'none';
+            ui.final.classList.add('hidden');
+            store.done = true;
+            localStorage.setItem('absurd_v3', JSON.stringify(store));
+            
+            if(gain) gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 3);
+            
+            await say("Endi bor. Hayot ko'chada.", 5000);
+            await say("Boyagina senga aytganimdek, foydali ish qil, masalan... azimga osh ober! hayr*", 15000);
+            vibr(1000);
+        };
+
+        // Background Static Noise
+        const bgC = document.getElementById('canvas-bg');
+        const bX = bgC.getContext('2d');
+        bgC.width = window.innerWidth; bgC.height = window.innerHeight;
+        function noise() {
+            bX.clearRect(0,0,bgC.width,bgC.height);
+            for(let i=0; i<100; i++) {
+                bX.fillStyle = `rgba(255,255,255,${Math.random()*0.2})`;
+                bX.fillRect(Math.random()*bgC.width, Math.random()*bgC.height, 1, 1);
+            }
+            requestAnimationFrame(noise);
+        }
+        noise();
+    </script>
+</body>
+</html>
